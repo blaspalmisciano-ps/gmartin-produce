@@ -201,44 +201,36 @@ resetBtn.addEventListener("click", () => {
   }
 });
 
-// --- API Key Setup ---
-async function checkApiKey() {
-  try {
-    const resp = await fetch("/api/key-status");
-    const data = await resp.json();
-    if (!data.has_key) {
-      showKeyPrompt();
-      return false;
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
+// --- Init ---
+async function init() {
+  connect();
+  loadPresets();
 
-function showKeyPrompt() {
-  const div = document.createElement("div");
-  div.className = "message assistant";
-  div.innerHTML = `
-    <strong>Welcome to GMartin Produce!</strong><br><br>
-    To get started, I need your Anthropic API key.<br>
-    Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a><br><br>
-    <input type="password" id="api-key-input" placeholder="sk-ant-..." style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;margin-bottom:8px">
-    <button onclick="submitApiKey()" style="padding:6px 16px;background:var(--accent);color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600">Save Key</button>
-    <span id="key-error" style="color:var(--red);font-size:12px;margin-left:8px"></span>
-  `;
-  messagesEl.appendChild(div);
+  const resp = await fetch("/api/key-status");
+  const data = await resp.json();
+
+  if (!data.has_key) {
+    const div = document.createElement("div");
+    div.className = "message assistant";
+    div.innerHTML = `
+      <strong>Welcome to GMartin Produce!</strong><br><br>
+      One-time setup: paste your Anthropic API key below.<br>
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">Get one here</a> (free tier available)<br><br>
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;margin-bottom:8px">
+      <button onclick="submitApiKey()" style="padding:8px 20px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px">Start Producing</button>
+      <span id="key-error" style="color:var(--red);font-size:12px;margin-left:8px"></span>
+    `;
+    messagesEl.appendChild(div);
+  } else {
+    addMessage("assistant", "Hey! I'm <strong>GMartin</strong>, your music production assistant. I can control Ableton Live, build sessions, tweak effects, and help you produce.\n\nTry: <em>\"Set up an indie rock session\"</em> or <em>\"Add more reverb to guitar L\"</em>");
+  }
 }
 
 async function submitApiKey() {
   const input = document.getElementById("api-key-input");
   const error = document.getElementById("key-error");
   const key = input.value.trim();
-
-  if (!key.startsWith("sk-ant-")) {
-    error.textContent = "Key must start with sk-ant-";
-    return;
-  }
+  if (!key) { error.textContent = "Please enter a key"; return; }
 
   const resp = await fetch("/api/set-key", {
     method: "POST",
@@ -246,23 +238,11 @@ async function submitApiKey() {
     body: JSON.stringify({key})
   });
   const data = await resp.json();
-
   if (data.ok) {
     messagesEl.innerHTML = "";
-    addMessage("assistant", "API key saved! Hey, I'm <strong>GMartin</strong>, your music production assistant. I can control Ableton Live, build sessions, tweak effects, and help you produce.\n\nTry: <em>\"Set up an indie rock session\"</em> or <em>\"Add more reverb to guitar L\"</em>");
+    addMessage("assistant", "Let's go! I'm <strong>GMartin</strong>, your music production assistant. I can control Ableton Live, build sessions, tweak effects, and help you produce.\n\nTry: <em>\"Set up an indie rock session\"</em> or <em>\"Add more reverb to guitar L\"</em>");
   } else {
     error.textContent = data.error || "Failed to save key";
-  }
-}
-
-// --- Init ---
-async function init() {
-  connect();
-  loadPresets();
-
-  const hasKey = await checkApiKey();
-  if (hasKey) {
-    addMessage("assistant", "Hey! I'm <strong>GMartin</strong>, your music production assistant. I can control Ableton Live, build sessions, tweak effects, and help you produce.\n\nTry: <em>\"Set up an indie rock session\"</em> or <em>\"Add more reverb to guitar L\"</em>");
   }
 }
 

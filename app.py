@@ -52,8 +52,8 @@ async def key_status():
 async def set_key(request: Request):
     data = await request.json()
     key = data.get("key", "")
-    if not key.startswith("sk-ant-"):
-        return {"error": "Invalid key format. Must start with sk-ant-"}
+    if not key:
+        return {"error": "Key cannot be empty"}
     os.environ["ANTHROPIC_API_KEY"] = key
     # Also save to .env for persistence
     env_path = Path(__file__).parent / ".env"
