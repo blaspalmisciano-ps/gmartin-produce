@@ -27,20 +27,20 @@ class AbletonClient:
             return {"status": "error", "result": {}, "message": str(e)}
         finally:
             sock.close()
-            time.sleep(0.3)
+            time.sleep(0.05)
 
     def is_connected(self) -> bool:
         """Check if Ableton is reachable."""
         r = self.send_command("get_session_info")
         return r.get("status") == "success"
 
-    def get_state(self) -> dict:
-        """Get full Ableton state — session info + per-track details."""
+    def get_state_light(self) -> dict:
+        """Get lightweight Ableton state — session info only, no per-track details."""
         session = self.send_command("get_session_info")
         if session.get("status") != "success":
             return {"connected": False, "error": session.get("message", "Not connected")}
 
-        state = {
+        return {
             "connected": True,
             "tempo": session["result"]["tempo"],
             "time_sig": f"{session['result']['signature_numerator']}/{session['result']['signature_denominator']}",
@@ -48,6 +48,12 @@ class AbletonClient:
             "master_volume": session["result"]["master_track"]["volume"],
             "tracks": [],
         }
+
+    def get_state(self) -> dict:
+        """Get full Ableton state — session info + per-track details."""
+        state = self.get_state_light()
+        if not state.get("connected"):
+            return state
 
         for i in range(state["track_count"]):
             t = self.send_command("get_track_info", {"track_index": i})

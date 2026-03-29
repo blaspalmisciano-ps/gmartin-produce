@@ -71,9 +71,15 @@ class ClaudeSession:
 
     def __init__(self, ableton: AbletonClient):
         self.ableton = ableton
-        self.client = anthropic.Anthropic()
-        self.messages: list[dict] = []
+        self.client = None
+        self.messages = []
         self.model = "claude-sonnet-4-6"
+
+    def _get_client(self):
+        """Get or create the Anthropic client — picks up key from env."""
+        import os
+        self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        return self.client
 
     def _get_system_prompt(self) -> str:
         presets = list_presets()
@@ -94,44 +100,85 @@ class ClaudeSession:
         return json.dumps(result)
 
     async def chat(self, user_message: str):
-        """Send a user message and yield response chunks (text and tool calls).
+        """Send a user message and yield response chunks with streaming."""
+        import asyncio
+        import queue
+        import threading
 
-        Yields dicts:
-          {"type": "text", "content": "..."}
-          {"type": "tool_call", "name": "...", "input": {...}}
-          {"type": "tool_result", "name": "...", "result": "..."}
-          {"type": "done"}
-          {"type": "error", "content": "..."}
-        """
         self.messages.append({"role": "user", "content": user_message})
 
         try:
-            while True:
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    system=self._get_system_prompt(),
-                    tools=TOOLS,
-                    messages=self.messages,
-                )
+            loop = asyncio.get_event_loop()
 
-                # Collect the assistant response
+            while True:
+                client = self._get_client()
+
+                # Use a queue to stream chunks from the sync thread to async
+                chunk_queue = queue.Queue()
+                collected_content = []
+
+                def run_stream():
+                    try:
+                        with client.messages.stream(
+                            model=self.model,
+                            max_tokens=4096,
+                            system=self._get_system_prompt(),
+                            tools=TOOLS,
+                            messages=self.messages,
+                        ) as stream:
+                            for event in stream:
+                                chunk_queue.put(("event", event))
+                            # Get the final message
+                            msg = stream.get_final_message()
+                            chunk_queue.put(("final", msg))
+                    except Exception as e:
+                        chunk_queue.put(("error", e))
+
+                thread = threading.Thread(target=run_stream, daemon=True)
+                thread.start()
+
+                # Process chunks as they arrive
+                while True:
+                    # Non-blocking check with short timeout
+                    try:
+                        item = await loop.run_in_executor(None, lambda: chunk_queue.get(timeout=0.1))
+                    except queue.Empty:
+                        continue
+
+                    kind, data = item
+
+                    if kind == "error":
+                        raise data
+
+                    if kind == "event":
+                        # Stream text deltas
+                        if hasattr(data, 'type'):
+                            if data.type == "content_block_delta":
+                                if hasattr(data.delta, 'text'):
+                                    yield {"type": "text_delta", "content": data.delta.text}
+                            elif data.type == "content_block_start":
+                                if hasattr(data.content_block, 'type') and data.content_block.type == "tool_use":
+                                    yield {"type": "tool_call", "name": data.content_block.name, "input": {}}
+                        continue
+
+                    if kind == "final":
+                        response = data
+                        break
+
+                # Process the final message
                 assistant_content = response.content
                 self.messages.append({"role": "assistant", "content": assistant_content})
 
-                # Process content blocks
                 has_tool_use = False
                 tool_results = []
 
                 for block in assistant_content:
-                    if block.type == "text":
-                        yield {"type": "text", "content": block.text}
-                    elif block.type == "tool_use":
+                    if block.type == "tool_use":
                         has_tool_use = True
+                        # Update the tool call with actual input
                         yield {"type": "tool_call", "name": block.name, "input": block.input}
 
-                        # Execute the tool
-                        result = self._execute_tool(block.name, block.input)
+                        result = await loop.run_in_executor(None, self._execute_tool, block.name, block.input)
                         yield {"type": "tool_result", "name": block.name, "result": result}
 
                         tool_results.append({
@@ -141,10 +188,8 @@ class ClaudeSession:
                         })
 
                 if has_tool_use:
-                    # Feed tool results back and continue the loop
                     self.messages.append({"role": "user", "content": tool_results})
                 else:
-                    # No tool calls — conversation turn is done
                     break
 
         except Exception as e:

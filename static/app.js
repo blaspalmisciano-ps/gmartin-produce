@@ -43,6 +43,14 @@ function handleMessage(msg) {
       appendToMessage(currentAssistantMsg, msg.content);
       break;
 
+    case "text_delta":
+      if (!currentAssistantMsg) {
+        currentAssistantMsg = addMessage("assistant", "");
+      }
+      currentAssistantMsg.appendChild(document.createTextNode(msg.content));
+      scrollToBottom();
+      break;
+
     case "tool_call":
       if (!currentAssistantMsg) {
         currentAssistantMsg = addMessage("assistant", "");
@@ -70,16 +78,12 @@ function handleMessage(msg) {
 
     case "done":
       currentAssistantMsg = null;
-      isProcessing = false;
-      sendBtn.disabled = false;
       inputEl.focus();
       break;
 
     case "error":
       addMessage("error", msg.content);
       currentAssistantMsg = null;
-      isProcessing = false;
-      sendBtn.disabled = false;
       break;
 
     case "ableton_state":
@@ -129,13 +133,12 @@ function scrollToBottom() {
 
 // --- Send ---
 function sendMessage(text) {
-  if (!text.trim() || isProcessing || !ws) return;
+  if (!text.trim() || !ws) return;
 
   addMessage("user", text);
   ws.send(JSON.stringify({ type: "chat", content: text }));
   inputEl.value = "";
-  isProcessing = true;
-  sendBtn.disabled = true;
+  // Don't block input — allow intermediate messages like Claude Code
 }
 
 formEl.addEventListener("submit", (e) => {

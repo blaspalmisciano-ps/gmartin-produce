@@ -66,16 +66,17 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     session = ClaudeSession(ableton)
 
-    # Send initial state
-    state = ableton.get_state()
+    # Send initial state (run in executor to avoid blocking)
+    loop = asyncio.get_event_loop()
+    state = await loop.run_in_executor(None, ableton.get_state)
     await ws.send_json({"type": "ableton_state", "data": state})
 
     # Background task to poll Ableton state
     async def poll_state():
         while True:
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             try:
-                state = ableton.get_state()
+                state = await loop.run_in_executor(None, ableton.get_state)
                 await ws.send_json({"type": "ableton_state", "data": state})
             except Exception:
                 break
@@ -93,10 +94,8 @@ async def websocket_endpoint(ws: WebSocket):
                 async for chunk in session.chat(user_text):
                     await ws.send_json(chunk)
 
-                    # After tool execution, push updated state
-                    if chunk.get("type") == "tool_result":
-                        state = ableton.get_state()
-                        await ws.send_json({"type": "ableton_state", "data": state})
+                    # Skip state updates during tool execution — too slow
+                    # Background poll will catch up
 
             elif msg.get("type") == "reset":
                 session.reset()
