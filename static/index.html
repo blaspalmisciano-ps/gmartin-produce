@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMartin Produce</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>GMartin Produce <span>by Claude</span></h1>
+      <div id="connection-status">
+        <div id="connection-dot"></div>
+        <span id="connection-text">Connecting...</span>
+      </div>
+    </header>
+
+    <div id="sidebar">
+      <div class="sidebar-section">
+        <h3>Ableton Live</h3>
+        <div id="ableton-state">
+          <div class="state-row">
+            <span class="state-label">Status</span>
+            <span class="state-value">Checking...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Tracks</h3>
+        <div id="tracks-list"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Presets</h3>
+        <div id="presets-list"></div>
+      </div>
+
+      <button id="reset-btn">Reset Conversation</button>
+    </div>
+
+    <div id="chat-area">
+      <div id="messages"></div>
+      <div id="input-area">
+        <form id="input-form">
+          <input type="text" id="user-input" placeholder="Tell GMartin what to do..." autocomplete="off" autofocus>
+          <button type="submit" id="send-btn">Send</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

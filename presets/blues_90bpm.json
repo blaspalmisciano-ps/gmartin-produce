@@ -1,0 +1,82 @@
+{
+  "name": "Blues 90BPM",
+  "description": "Classic blues shuffle, piano chords, walking bass triads, A-E-G progression",
+  "tempo": 90,
+  "tracks": [
+    {
+      "type": "midi",
+      "name": "\ud83c\udfb9 Piano",
+      "devices": [
+        {"uri": "query:Synths#Operator"}
+      ],
+      "clips": [
+        {
+          "index": 0,
+          "length": 24.0,
+          "notes_generator": "blues_piano_aeg"
+        }
+      ]
+    },
+    {
+      "type": "midi",
+      "name": "\ud83c\udfb5 Bass",
+      "devices": [
+        {"uri": "query:Synths#Operator"}
+      ],
+      "clips": [
+        {
+          "index": 0,
+          "length": 24.0,
+          "notes_generator": "blues_bass_triads_aeg"
+        }
+      ]
+    },
+    {
+      "type": "midi",
+      "name": "\ud83e\udd41 Drums",
+      "devices": [
+        {"uri": "query:Drums#FileId_5447"}
+      ],
+      "clips": [
+        {
+          "index": 0,
+          "length": 24.0,
+          "notes_generator": "blues_shuffle_drums"
+        }
+      ]
+    },
+    {
+      "type": "audio",
+      "name": "\ud83c\udfb8 Guitar L",
+      "devices": [
+        {"uri": "query:AudioFx#Tuner"},
+        {"uri": "query:AudioFx#Gate"},
+        {"uri": "query:AudioFx#EQ%20Eight"},
+        {"uri": "query:AudioFx#Compressor"},
+        {"uri": "query:AudioFx#Utility"},
+        {"uri": "query:AudioFx#Reverb"}
+      ],
+      "input_routing": {"type": "Ext. In", "channel": 2},
+      "volume": 1.0,
+      "panning": -1.0
+    },
+    {
+      "type": "audio",
+      "name": "\ud83c\udfb8 Guitar R",
+      "devices": [
+        {"uri": "query:AudioFx#Tuner"},
+        {"uri": "query:AudioFx#Gate"},
+        {"uri": "query:AudioFx#EQ%20Eight"},
+        {"uri": "query:AudioFx#Compressor"},
+        {"uri": "query:AudioFx#Utility"},
+        {"uri": "query:AudioFx#Echo"},
+        {"uri": "query:AudioFx#Reverb"}
+      ],
+      "input_routing": {"type": "Ext. In", "channel": 2},
+      "volume": 1.0,
+      "panning": 1.0
+    }
+  ],
+  "arm_tracks": [3, 4],
+  "autoplay_clip": {"track": 2, "clip": 0}
+}
