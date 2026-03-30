@@ -63,6 +63,7 @@ TOOLS = [
     {"name": "stop_recording", "description": "Disable record mode", "input_schema": {"type": "object", "properties": {}}},
     {"name": "back_to_arrangement", "description": "Stop all session clips and return to arrangement playback. Call after firing any session clips.", "input_schema": {"type": "object", "properties": {}}},
     {"name": "apply_preset", "description": "Apply a song style preset. Available: indie_rock, blues_90bpm", "input_schema": {"type": "object", "properties": {"preset_id": {"type": "string"}}, "required": ["preset_id"]}},
+    {"name": "clean_slate", "description": "Delete all tracks except track 0 and set tempo. Use this instead of calling delete_track multiple times — much faster.", "input_schema": {"type": "object", "properties": {"tempo": {"type": "number", "default": 120}}}},
 ]
 
 
@@ -86,6 +87,12 @@ class ClaudeSession:
         preset_text = "\n".join(f"- {p['id']}: {p['name']} — {p['description']}" for p in presets)
         return SYSTEM_PROMPT.format(presets=preset_text or "No presets available")
 
+    def _trim_history(self):
+        """Keep conversation history small to avoid rate limits."""
+        # Keep only last 10 message pairs
+        if len(self.messages) > 20:
+            self.messages = self.messages[-20:]
+
     def _execute_tool(self, name: str, input_data: dict) -> str:
         """Execute an Ableton tool and return the result as a string."""
         if name == "apply_preset":
@@ -95,9 +102,24 @@ class ClaudeSession:
             log = apply_preset(preset, self.ableton)
             return json.dumps({"log": log})
 
+        if name == "clean_slate":
+            info = self.ableton.send_command("get_session_info")
+            if info.get("status") != "success":
+                return json.dumps({"error": "Not connected"})
+            tc = info["result"]["track_count"]
+            for i in range(tc - 1, 0, -1):
+                self.ableton.send_command("delete_track", {"track_index": i})
+            tempo = input_data.get("tempo", 120)
+            self.ableton.send_command("set_tempo", {"tempo": tempo})
+            return json.dumps({"deleted": tc - 1, "remaining": 1, "tempo": tempo})
+
         # All other tools map directly to Ableton commands
         result = self.ableton.send_command(name, input_data)
-        return json.dumps(result)
+        # Truncate large results to save tokens
+        result_str = json.dumps(result)
+        if len(result_str) > 2000:
+            result_str = result_str[:2000] + '..."}'
+        return result_str
 
     async def chat(self, user_message: str):
         """Send a user message and yield response chunks with streaming."""
@@ -106,6 +128,7 @@ class ClaudeSession:
         import threading
 
         self.messages.append({"role": "user", "content": user_message})
+        self._trim_history()
 
         try:
             loop = asyncio.get_event_loop()
